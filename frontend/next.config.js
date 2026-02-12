@@ -1,0 +1,26 @@
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: "standalone",
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "polymarket-upload.s3.us-east-2.amazonaws.com",
+      },
+      {
+        protocol: "https",
+        hostname: "**.polymarket.com",
+      },
+    ],
+  },
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${process.env.API_URL || "http://localhost:8000"}/api/:path*`,
+      },
+    ];
+  },
+};
+
+module.exports = nextConfig;
