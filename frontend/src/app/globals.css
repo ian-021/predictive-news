@@ -518,13 +518,24 @@ button {
 
 .ti-mover-row {
   display: grid;
-  grid-template-columns: 50px 16px minmax(0, 1fr) 38px;
+  grid-template-columns: minmax(0, 1fr) 38px;
   align-items: center;
   gap: 8px;
   border-bottom: 1px solid var(--ti-border);
   padding: 10px;
   font-size: 11px;
   color: var(--ti-dim);
+}
+
+.ti-mover-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ti-mover-delta {
+  flex-shrink: 0;
 }
 
 .ti-mover-row:hover {

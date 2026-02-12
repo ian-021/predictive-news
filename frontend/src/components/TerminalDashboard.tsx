@@ -309,12 +309,13 @@ export function TerminalDashboard() {
 
                 return (
                   <div key={market.id} className="ti-mover-row">
-                    <span className={isUp ? "ti-green" : "ti-red"}>
-                      {isUp ? "+" : ""}
-                      {delta}%
-                    </span>
-                    <span className={isUp ? "ti-green" : "ti-red"}>{isUp ? "▲" : "▼"}</span>
-                    <span className="ti-mover-title">{market.question}</span>
+                    <div className="ti-mover-main">
+                      <span className={`ti-mover-delta ${isUp ? "ti-green" : "ti-red"}`}>
+                        {isUp ? "▲+" : "▼"}
+                        {delta}%
+                      </span>
+                      <span className="ti-mover-title">{market.question}</span>
+                    </div>
                     <span>{toPercent(market.current_price)}%</span>
                   </div>
                 );
