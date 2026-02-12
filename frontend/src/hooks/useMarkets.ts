@@ -2,7 +2,7 @@
 
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { fetchMarkets, fetchMarketDetail, fetchCategories, fetchHealth } from "@/lib/api";
-import type { FeedFilters, CategorySlug, SortOption } from "@/lib/types";
+import type { FeedFilters } from "@/lib/types";
 
 export function useMarketFeed(filters: FeedFilters) {
   return useInfiniteQuery({
@@ -14,7 +14,8 @@ export function useMarketFeed(filters: FeedFilters) {
       const nextOffset = lastPage.offset + lastPage.limit;
       return nextOffset < lastPage.total ? nextOffset : undefined;
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 90 * 1000,
+    refetchInterval: 2 * 60 * 1000,
   });
 }
 
@@ -23,7 +24,8 @@ export function useMarketDetail(id: string | null) {
     queryKey: ["market", id],
     queryFn: () => fetchMarketDetail(id!),
     enabled: !!id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 90 * 1000,
+    refetchInterval: 2 * 60 * 1000,
   });
 }
 

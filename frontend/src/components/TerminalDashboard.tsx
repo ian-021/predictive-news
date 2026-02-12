@@ -5,6 +5,26 @@ import { useCategories, useHealth, useMarketDetail, useMarketFeed } from "@/hook
 import { formatRelativeTime, formatVolume } from "@/lib/utils";
 import type { CategorySlug, FeedFilters, MarketCard, PricePoint } from "@/lib/types";
 
+function useSyncFlash(lastIngestion: string | null | undefined) {
+  const [flash, setFlash] = useState(false);
+  const prevRef = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (
+      lastIngestion &&
+      prevRef.current !== undefined &&
+      prevRef.current !== lastIngestion
+    ) {
+      setFlash(true);
+      const id = window.setTimeout(() => setFlash(false), 1500);
+      return () => window.clearTimeout(id);
+    }
+    prevRef.current = lastIngestion;
+  }, [lastIngestion]);
+
+  return flash;
+}
+
 type CategoryFilter = "all" | CategorySlug;
 
 interface SidebarCategory {
@@ -131,13 +151,6 @@ export function TerminalDashboard() {
     [sortedMarkets]
   );
 
-  const syncText = useMemo(() => {
-    const staleness = healthQuery.data?.staleness_minutes;
-    if (staleness === null || staleness === undefined) return "N/A";
-    if (staleness < 1) return "<1m AGO";
-    return `${Math.round(staleness)}m AGO`;
-  }, [healthQuery.data?.staleness_minutes]);
-
   const healthScore = useMemo(() => {
     const rate = healthQuery.data?.api_error_rate;
     if (rate === null || rate === undefined) return "--";
@@ -145,7 +158,8 @@ export function TerminalDashboard() {
     return score.toFixed(1);
   }, [healthQuery.data?.api_error_rate]);
 
-  const isConnected = healthQuery.data?.status === "ok";
+  const isConnected = healthQuery.data?.status === "healthy";
+  const feedSyncFlash = useSyncFlash(healthQuery.data?.last_ingestion);
 
   return (
     <div className="ti-shell">
@@ -197,7 +211,7 @@ export function TerminalDashboard() {
           </div>
         </section>
 
-        <section className="ti-panel ti-feed-panel">
+        <section className={`ti-panel ti-feed-panel${feedSyncFlash ? " ti-feed-sync-glow" : ""}`}>
           <div className="ti-panel-head ti-feed-head">
             <span>PRIMARY FEED - WIRE SERVICE</span>
             <span>{sortedMarkets.length} ACTIVE</span>
@@ -337,9 +351,7 @@ export function TerminalDashboard() {
         </div>
 
         <div>
-          <span className="ti-status-muted">
-            LAST SYNC: <strong>{syncText}</strong>
-          </span>
+          <SyncCountdown lastIngestion={healthQuery.data?.last_ingestion ?? null} />
           <LiveClock />
         </div>
       </footer>
@@ -467,6 +479,60 @@ const TickerBar = memo(function TickerBar({ items }: { items: MarketCard[] }) {
 });
 
 TickerBar.displayName = "TickerBar";
+
+const SYNC_INTERVAL_S = 2 * 60; // 2 minutes
+
+function SyncCountdown({ lastIngestion }: { lastIngestion: string | null }) {
+  const [now, setNow] = useState(() => Date.now());
+  const [justSynced, setJustSynced] = useState(false);
+  const prevIngestionRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (
+      lastIngestion &&
+      prevIngestionRef.current !== null &&
+      prevIngestionRef.current !== lastIngestion
+    ) {
+      setJustSynced(true);
+      const id = window.setTimeout(() => setJustSynced(false), 3000);
+      return () => window.clearTimeout(id);
+    }
+    prevIngestionRef.current = lastIngestion;
+  }, [lastIngestion]);
+
+  if (!lastIngestion) {
+    return (
+      <span className="ti-status-muted">
+        SYNC: <strong>N/A</strong>
+      </span>
+    );
+  }
+
+  const elapsedS = Math.max(0, (now - new Date(lastIngestion).getTime()) / 1000);
+  const remaining = SYNC_INTERVAL_S - (Math.floor(elapsedS) % SYNC_INTERVAL_S);
+  const minutes = Math.floor(remaining / 60);
+  const seconds = remaining % 60;
+  const display = `${minutes}:${String(seconds).padStart(2, "0")}`;
+
+  if (justSynced) {
+    return (
+      <span className="ti-sync-flash">
+        SYNCED <strong className="ti-green">&#10003;</strong>
+      </span>
+    );
+  }
+
+  return (
+    <span className="ti-status-muted">
+      NEXT SYNC: <strong>{display}</strong>
+    </span>
+  );
+}
 
 function LiveClock() {
   const [timeString, setTimeString] = useState("--:--:--");

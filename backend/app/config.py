@@ -20,13 +20,13 @@ class Settings(BaseSettings):
 
     # App
     ENV: str = "development"
-    FEED_CACHE_TTL: int = 300  # 5 minutes
+    FEED_CACHE_TTL: int = 90  # 90 seconds
     CATEGORY_CACHE_TTL: int = 3600  # 1 hour
-    MARKET_CACHE_TTL: int = 300  # 5 minutes
-    INGESTION_INTERVAL: int = 900  # 15 minutes in seconds
+    MARKET_CACHE_TTL: int = 90  # 90 seconds
+    INGESTION_INTERVAL: int = 120  # 2 minutes in seconds
 
     # Staleness threshold (seconds)
-    STALENESS_THRESHOLD: int = 1800  # 30 minutes
+    STALENESS_THRESHOLD: int = 300  # 5 minutes
 
     class Config:
         env_file = ".env"

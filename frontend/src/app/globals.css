@@ -287,6 +287,28 @@ button {
   flex-direction: column;
   min-height: 0;
   box-shadow: inset 0 0 0 1px rgba(23, 54, 31, 0.45);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.ti-feed-sync-glow {
+  animation: ti-feed-pulse 1.5s ease-out forwards;
+}
+
+@keyframes ti-feed-pulse {
+  0% {
+    border-color: var(--ti-green);
+    box-shadow: 0 0 12px rgba(71, 255, 107, 0.5), 0 0 24px rgba(71, 255, 107, 0.25),
+      inset 0 0 8px rgba(71, 255, 107, 0.15);
+  }
+  40% {
+    border-color: var(--ti-green);
+    box-shadow: 0 0 8px rgba(71, 255, 107, 0.3), 0 0 16px rgba(71, 255, 107, 0.15),
+      inset 0 0 4px rgba(71, 255, 107, 0.08);
+  }
+  100% {
+    border-color: #17361f;
+    box-shadow: inset 0 0 0 1px rgba(23, 54, 31, 0.45);
+  }
 }
 
 .ti-feed-head {
@@ -588,6 +610,24 @@ button {
 
 .ti-live-dot.is-offline {
   background: var(--ti-red);
+}
+
+.ti-sync-flash {
+  color: var(--ti-green);
+  text-shadow: 0 0 8px rgba(71, 255, 107, 0.6);
+  animation: ti-sync-glow 3s ease-out forwards;
+}
+
+@keyframes ti-sync-glow {
+  0% {
+    text-shadow: 0 0 12px rgba(71, 255, 107, 0.9), 0 0 24px rgba(71, 255, 107, 0.5);
+  }
+  60% {
+    text-shadow: 0 0 8px rgba(71, 255, 107, 0.6);
+  }
+  100% {
+    text-shadow: 0 0 4px rgba(71, 255, 107, 0.2);
+  }
 }
 
 .ti-green {

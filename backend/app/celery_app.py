@@ -23,9 +23,9 @@ celery_app.conf.update(
 
 # Scheduled tasks
 celery_app.conf.beat_schedule = {
-    "ingest-markets-every-15-min": {
+    "ingest-markets": {
         "task": "polynews.ingest_markets",
-        "schedule": settings.INGESTION_INTERVAL,  # 900 seconds = 15 minutes
+        "schedule": settings.INGESTION_INTERVAL,  # 120 seconds = 2 minutes
     },
 }
 

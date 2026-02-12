@@ -43,7 +43,9 @@ async def health_check(
             last_ingestion = datetime.fromisoformat(last_ingestion_str)
             now = datetime.now(timezone.utc)
             staleness_minutes = (now - last_ingestion).total_seconds() / 60
-            if staleness_minutes > 30:
+            from app.config import get_settings
+            threshold = get_settings().STALENESS_THRESHOLD / 60
+            if staleness_minutes > threshold:
                 status = "stale"
     except Exception:
         pass
