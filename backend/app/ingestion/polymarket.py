@@ -28,7 +28,7 @@ class PolymarketClient:
             timeout=30.0,
             headers={
                 "Accept": "application/json",
-                "User-Agent": "PolyNews/1.0",
+                "User-Agent": "FTM/1.0",
             },
         )
 

@@ -66,7 +66,7 @@ export function Header({ activeTab, onTabChange, onHelpClick }: HeaderProps) {
           />
           <button
             onClick={onHelpClick}
-            title="What is PolyNews?"
+            title="What is FTM?"
             aria-label="Help"
             style={{
               display: "flex",

@@ -1,4 +1,4 @@
--- PolyNews Database Schema
+-- Follow The Money Database Schema
 
 CREATE TABLE IF NOT EXISTS markets (
     id TEXT PRIMARY KEY,
