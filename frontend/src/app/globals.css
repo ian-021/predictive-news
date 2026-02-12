@@ -67,6 +67,7 @@ body {
   color: var(--ti-text);
   font-family: "IBM Plex Mono", "Space Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   overflow: hidden;
+  text-transform: uppercase;
 }
 
 a {
@@ -465,6 +466,7 @@ button {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+  font-size: 12px;
 }
 
 .ti-breaking-score {
