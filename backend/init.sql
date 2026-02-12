@@ -1,4 +1,4 @@
--- Follow The Money Database Schema
+-- Follow The Signal Database Schema
 
 CREATE TABLE IF NOT EXISTS markets (
     id TEXT PRIMARY KEY,

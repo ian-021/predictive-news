@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Follow The Money API",
+    title="Follow The Signal API",
     description="Prediction market data as a news feed",
     version="1.0.0",
     lifespan=lifespan,
@@ -66,7 +66,7 @@ app.include_router(ingest_router)
 @app.get("/")
 async def root():
     return {
-        "name": "Follow The Money API",
+        "name": "Follow The Signal API",
         "version": "1.0.0",
         "docs": "/docs",
     }

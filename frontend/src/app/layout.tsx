@@ -3,7 +3,7 @@ import { QueryProvider } from "@/providers/QueryProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Follow The Money — Prediction Market News Feed",
+  title: "Follow The Signal — Prediction Market News Feed",
   description:
     "See what's likely to happen based on real-money predictions from thousands of traders. Politics, crypto, sports, tech — powered by Polymarket data.",
   keywords: [
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     "tech",
   ],
   openGraph: {
-    title: "Follow The Money — Prediction Market News Feed",
+    title: "Follow The Signal — Prediction Market News Feed",
     description:
       "See what's likely to happen based on real-money predictions from Polymarket.",
     type: "website",
