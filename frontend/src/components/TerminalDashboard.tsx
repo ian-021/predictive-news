@@ -170,7 +170,7 @@ export function TerminalDashboard() {
       <header className="ti-brand-header">
         <div className="ti-brand-left">
           <h1 className="ti-brand-logo">FTS</h1>
-          <span className="ti-brand-subtitle">NEWS TERMINAL FROM THE FUTURE</span>
+          <span className="ti-brand-subtitle">TERMINAL FOR NEWS FROM THE FUTURE</span>
         </div>
         <div className="ti-brand-meta">
           <span>v2.4.1</span>
