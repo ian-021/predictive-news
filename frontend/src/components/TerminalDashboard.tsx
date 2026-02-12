@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useCategories, useHealth, useMarketDetail, useMarketFeed } from "@/hooks/useMarkets";
 import { formatRelativeTime, formatVolume } from "@/lib/utils";
 import type { CategorySlug, FeedFilters, MarketCard, PricePoint } from "@/lib/types";
@@ -21,7 +21,7 @@ const signedDelta = (market: MarketCard) => {
 };
 
 const probabilityColorClass = (probability: number) => {
-  if (probability >= 80) return "ti-green";
+  if (probability > 80) return "ti-green";
   if (probability >= 50) return "ti-amber";
   return "ti-red";
 };
@@ -63,14 +63,6 @@ const buildSidebarCategories = (categories: { name: string; slug: string; market
 export function TerminalDashboard() {
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("all");
   const [expandedMarketId, setExpandedMarketId] = useState<string | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
-  const [clock, setClock] = useState(() => new Date());
-
-  useEffect(() => {
-    setIsMounted(true);
-    const interval = window.setInterval(() => setClock(new Date()), 1000);
-    return () => window.clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     setExpandedMarketId(null);
@@ -148,9 +140,6 @@ export function TerminalDashboard() {
   }, [healthQuery.data?.api_error_rate]);
 
   const isConnected = healthQuery.data?.status === "ok";
-  const timeString = isMounted
-    ? clock.toLocaleTimeString("en-US", { hour12: false })
-    : "--:--:--";
 
   return (
     <div className="ti-shell">
@@ -344,16 +333,91 @@ export function TerminalDashboard() {
           <span className="ti-status-muted">
             LAST SYNC: <strong>{syncText}</strong>
           </span>
-          <span className="ti-green" suppressHydrationWarning>
-            {timeString}
-          </span>
+          <LiveClock />
         </div>
       </footer>
     </div>
   );
 }
 
-function TickerBar({ items }: { items: MarketCard[] }) {
+const TickerBar = memo(function TickerBar({ items }: { items: MarketCard[] }) {
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const frameRef = useRef<number | null>(null);
+  const segmentWidthRef = useRef(0);
+  const offsetRef = useRef(0);
+  const speedRef = useRef(0);
+  const isHoveredRef = useRef(false);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track || items.length === 0) return;
+
+    const syncWidth = () => {
+      const segmentWidth = track.scrollWidth / 2;
+      segmentWidthRef.current = segmentWidth;
+
+      if (segmentWidth <= 0) {
+        offsetRef.current = 0;
+        track.style.transform = "translate3d(0, 0, 0)";
+        return;
+      }
+
+      while (offsetRef.current <= -segmentWidth) {
+        offsetRef.current += segmentWidth;
+      }
+      while (offsetRef.current > 0) {
+        offsetRef.current -= segmentWidth;
+      }
+
+      track.style.transform = `translate3d(${offsetRef.current}px, 0, 0)`;
+    };
+
+    syncWidth();
+    window.addEventListener("resize", syncWidth);
+
+    return () => window.removeEventListener("resize", syncWidth);
+  }, [items]);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track || items.length === 0) return;
+
+    const baseDurationSeconds = 48.9;
+    let lastFrame = performance.now();
+
+    const animate = (timestamp: number) => {
+      const deltaMs = timestamp - lastFrame;
+      lastFrame = timestamp;
+      const segmentWidth = segmentWidthRef.current;
+
+      if (segmentWidth > 0) {
+        const baseSpeedPxPerSecond = segmentWidth / baseDurationSeconds;
+        const targetSpeedPxPerSecond = isHoveredRef.current ? 0 : baseSpeedPxPerSecond;
+        const easing = 1 - Math.exp(-deltaMs / 220);
+
+        speedRef.current += (targetSpeedPxPerSecond - speedRef.current) * easing;
+        offsetRef.current -= speedRef.current * (deltaMs / 1000);
+
+        if (offsetRef.current <= -segmentWidth) {
+          offsetRef.current += segmentWidth;
+        }
+
+        track.style.transform = `translate3d(${offsetRef.current}px, 0, 0)`;
+      }
+
+      frameRef.current = window.requestAnimationFrame(animate);
+    };
+
+    frameRef.current = window.requestAnimationFrame(animate);
+
+    return () => {
+      if (frameRef.current !== null) {
+        window.cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+    };
+  }, [items]);
+
   if (items.length === 0) {
     return (
       <div className="ti-ticker-shell">
@@ -365,23 +429,53 @@ function TickerBar({ items }: { items: MarketCard[] }) {
   }
 
   return (
-    <div className="ti-ticker-shell">
-      <div className="ti-ticker-track">
+    <div
+      className="ti-ticker-shell"
+      onMouseEnter={() => {
+        isHoveredRef.current = true;
+      }}
+      onMouseLeave={() => {
+        isHoveredRef.current = false;
+      }}
+    >
+      <div ref={trackRef} className="ti-ticker-track">
         {items.concat(items).map((market, idx) => {
           const delta = signedDelta(market);
           const isUp = delta >= 0;
+          const probability = toPercent(market.current_price);
           return (
             <span key={`${market.id}-${idx}`} className="ti-ticker-item">
-              <span className="ti-panel-muted">{market.question}</span>
-              <span className={isUp ? "ti-green" : "ti-red"}>
-                {isUp ? "▲" : "▼"} {toPercent(market.current_price)}%
-              </span>
+              <span className="ti-panel-muted">{market.question.toUpperCase()}</span>
+              <span className={isUp ? "ti-green" : "ti-red"}>{isUp ? "▲" : "▼"}</span>
+              <span className={`ti-ticker-prob ${probabilityColorClass(probability)}`}>{probability}%</span>
               <span className="ti-panel-muted">·</span>
             </span>
           );
         })}
       </div>
     </div>
+  );
+});
+
+TickerBar.displayName = "TickerBar";
+
+function LiveClock() {
+  const [timeString, setTimeString] = useState("--:--:--");
+
+  useEffect(() => {
+    const updateClock = () => {
+      setTimeString(new Date().toLocaleTimeString("en-US", { hour12: false }));
+    };
+
+    updateClock();
+    const interval = window.setInterval(updateClock, 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  return (
+    <span className="ti-green" suppressHydrationWarning>
+      {timeString}
+    </span>
   );
 }
 
