@@ -486,6 +486,9 @@ function SyncCountdown({ lastIngestion }: { lastIngestion: string | null }) {
   const [now, setNow] = useState(() => Date.now());
   const [justSynced, setJustSynced] = useState(false);
   const prevIngestionRef = useRef<string | null>(null);
+  // Tracks when the frontend *detected* the last sync — not the server timestamp.
+  // The countdown resets from this moment, so it stays in sync with what the user sees.
+  const lastDetectedAtRef = useRef<number>(Date.now());
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
@@ -498,9 +501,14 @@ function SyncCountdown({ lastIngestion }: { lastIngestion: string | null }) {
       prevIngestionRef.current !== null &&
       prevIngestionRef.current !== lastIngestion
     ) {
+      lastDetectedAtRef.current = Date.now();
       setJustSynced(true);
       const id = window.setTimeout(() => setJustSynced(false), 3000);
       return () => window.clearTimeout(id);
+    }
+    if (lastIngestion && prevIngestionRef.current === null) {
+      // First load — seed the timer from the server timestamp
+      lastDetectedAtRef.current = new Date(lastIngestion).getTime();
     }
     prevIngestionRef.current = lastIngestion;
   }, [lastIngestion]);
@@ -513,8 +521,8 @@ function SyncCountdown({ lastIngestion }: { lastIngestion: string | null }) {
     );
   }
 
-  const elapsedS = Math.max(0, (now - new Date(lastIngestion).getTime()) / 1000);
-  const remaining = SYNC_INTERVAL_S - (Math.floor(elapsedS) % SYNC_INTERVAL_S);
+  const elapsedS = Math.max(0, (now - lastDetectedAtRef.current) / 1000);
+  const remaining = Math.max(0, SYNC_INTERVAL_S - Math.floor(elapsedS));
   const minutes = Math.floor(remaining / 60);
   const seconds = remaining % 60;
   const display = `${minutes}:${String(seconds).padStart(2, "0")}`;

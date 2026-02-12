@@ -33,7 +33,7 @@ def ingest_markets_task():
     """
     Main ingestion task: fetch markets from Polymarket and store snapshots.
 
-    This runs every 15 minutes via Celery Beat, and once on startup.
+    This runs every 2 minutes via Celery Beat, and once on startup.
     Idempotent: duplicate snapshots are prevented by composite PK.
     Fully synchronous — safe for threads and Celery workers.
     """
@@ -192,7 +192,7 @@ def _increment_counter(rds, key: str, count: int = 1, ttl: int = 3600):
         pipe.expire(key, ttl)
         pipe.execute()
     except Exception:
-        pass
+        logger.exception("Failed to increment Redis counter: %s", key)
 
 
 def _delete_keys_by_pattern(rds, pattern: str):
@@ -206,4 +206,4 @@ def _delete_keys_by_pattern(rds, pattern: str):
             if cursor == 0:
                 break
     except Exception:
-        pass
+        logger.exception("Failed to delete Redis keys for pattern: %s", pattern)

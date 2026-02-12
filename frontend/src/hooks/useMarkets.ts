@@ -41,7 +41,7 @@ export function useHealth() {
   return useQuery({
     queryKey: ["health"],
     queryFn: fetchHealth,
-    staleTime: 60 * 1000, // 1 minute
-    refetchInterval: 60 * 1000,
+    staleTime: 10 * 1000, // 10 seconds
+    refetchInterval: 15 * 1000, // poll every 15s — endpoint is lightweight
   });
 }

@@ -1,8 +1,10 @@
 import json
+import logging
 import redis.asyncio as aioredis
 from typing import Optional, Any
 from app.config import get_settings
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 redis_client = aioredis.from_url(
@@ -19,7 +21,7 @@ async def cache_get(key: str) -> Optional[Any]:
         if value:
             return json.loads(value)
     except Exception:
-        pass
+        logger.exception("Cache read failure for key: %s", key)
     return None
 
 
@@ -28,7 +30,7 @@ async def cache_set(key: str, value: Any, ttl: int = 300) -> None:
     try:
         await redis_client.set(key, json.dumps(value, default=str), ex=ttl)
     except Exception:
-        pass
+        logger.exception("Cache write failure for key: %s", key)
 
 
 async def cache_delete(key: str) -> None:
@@ -36,7 +38,7 @@ async def cache_delete(key: str) -> None:
     try:
         await redis_client.delete(key)
     except Exception:
-        pass
+        logger.exception("Cache delete failure for key: %s", key)
 
 
 async def cache_delete_pattern(pattern: str) -> None:
@@ -48,7 +50,7 @@ async def cache_delete_pattern(pattern: str) -> None:
         if keys:
             await redis_client.delete(*keys)
     except Exception:
-        pass
+        logger.exception("Cache pattern delete failure for pattern: %s", pattern)
 
 
 async def get_last_ingestion_time() -> Optional[str]:
@@ -56,6 +58,7 @@ async def get_last_ingestion_time() -> Optional[str]:
     try:
         return await redis_client.get("polynews:last_ingestion")
     except Exception:
+        logger.exception("Failed to read last ingestion timestamp")
         return None
 
 
@@ -64,7 +67,7 @@ async def set_last_ingestion_time(timestamp: str) -> None:
     try:
         await redis_client.set("polynews:last_ingestion", timestamp)
     except Exception:
-        pass
+        logger.exception("Failed to write last ingestion timestamp")
 
 
 async def increment_error_count() -> None:
@@ -76,7 +79,7 @@ async def increment_error_count() -> None:
         await pipe.expire(key, 3600)
         await pipe.execute()
     except Exception:
-        pass
+        logger.exception("Failed to increment error counter")
 
 
 async def get_error_count() -> int:
@@ -85,6 +88,7 @@ async def get_error_count() -> int:
         count = await redis_client.get("polynews:errors:hourly")
         return int(count) if count else 0
     except Exception:
+        logger.exception("Failed to read error counter")
         return 0
 
 
@@ -94,6 +98,7 @@ async def get_request_count() -> int:
         count = await redis_client.get("polynews:requests:daily")
         return int(count) if count else 0
     except Exception:
+        logger.exception("Failed to read request counter")
         return 0
 
 
@@ -106,4 +111,4 @@ async def increment_request_count() -> None:
         await pipe.expire(key, 86400)
         await pipe.execute()
     except Exception:
-        pass
+        logger.exception("Failed to increment request counter")
