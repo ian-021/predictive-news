@@ -26,6 +26,12 @@ const probabilityColorClass = (probability: number) => {
   return "ti-red";
 };
 
+const tickerIndicatorSymbol = (probability: number) => {
+  if (probability > 80) return "▲";
+  if (probability >= 50) return "●";
+  return "▼";
+};
+
 const resolutionLabel = (resolutionDate: string | null) => {
   if (!resolutionDate) return "LIVE";
 
@@ -383,6 +389,7 @@ const TickerBar = memo(function TickerBar({ items }: { items: MarketCard[] }) {
     if (!track || items.length === 0) return;
 
     const baseDurationSeconds = 48.9;
+    const speedFactor = 0.8;
     let lastFrame = performance.now();
 
     const animate = (timestamp: number) => {
@@ -391,7 +398,7 @@ const TickerBar = memo(function TickerBar({ items }: { items: MarketCard[] }) {
       const segmentWidth = segmentWidthRef.current;
 
       if (segmentWidth > 0) {
-        const baseSpeedPxPerSecond = segmentWidth / baseDurationSeconds;
+        const baseSpeedPxPerSecond = (segmentWidth / baseDurationSeconds) * speedFactor;
         const targetSpeedPxPerSecond = isHoveredRef.current ? 0 : baseSpeedPxPerSecond;
         const easing = 1 - Math.exp(-deltaMs / 220);
 
@@ -440,14 +447,14 @@ const TickerBar = memo(function TickerBar({ items }: { items: MarketCard[] }) {
     >
       <div ref={trackRef} className="ti-ticker-track">
         {items.concat(items).map((market, idx) => {
-          const delta = signedDelta(market);
-          const isUp = delta >= 0;
           const probability = toPercent(market.current_price);
+          const colorClass = probabilityColorClass(probability);
+          const symbol = tickerIndicatorSymbol(probability);
           return (
             <span key={`${market.id}-${idx}`} className="ti-ticker-item">
               <span className="ti-panel-muted">{market.question.toUpperCase()}</span>
-              <span className={isUp ? "ti-green" : "ti-red"}>{isUp ? "▲" : "▼"}</span>
-              <span className={`ti-ticker-prob ${probabilityColorClass(probability)}`}>{probability}%</span>
+              <span className={colorClass}>{symbol}</span>
+              <span className={`ti-ticker-prob ${colorClass}`}>{probability}%</span>
               <span className="ti-panel-muted">·</span>
             </span>
           );
