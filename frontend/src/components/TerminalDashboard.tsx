@@ -389,7 +389,7 @@ const TickerBar = memo(function TickerBar({ items }: { items: MarketCard[] }) {
     if (!track || items.length === 0) return;
 
     const baseDurationSeconds = 48.9;
-    const speedFactor = 0.8;
+    const speedFactor = 0.3;
     const stopEasingMs = 165;
     let lastFrame = performance.now();
 
