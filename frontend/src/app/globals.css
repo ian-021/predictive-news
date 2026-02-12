@@ -53,7 +53,7 @@
 
 html,
 body {
-  min-height: 100%;
+  height: 100%;
 }
 
 html {
@@ -66,6 +66,7 @@ body {
   background: var(--ti-bg);
   color: var(--ti-text);
   font-family: "IBM Plex Mono", "Space Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow: hidden;
 }
 
 a {
@@ -89,12 +90,13 @@ button {
 }
 
 .ti-shell {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--ti-bg);
   color: var(--ti-text);
   position: relative;
+  overflow: hidden;
 }
 
 .ti-crt-overlay {
@@ -222,6 +224,7 @@ button {
   grid-template-columns: 140px minmax(0, 1fr) 320px;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .ti-panel {
@@ -240,7 +243,7 @@ button {
 
 .ti-panel-muted {
   color: var(--ti-dim);
-  font-size: 10px;
+  font-size: 14px;
 }
 
 .ti-sidebar {
@@ -278,10 +281,11 @@ button {
 }
 
 .ti-feed-panel {
-  border-right: 0;
+  border: 1px solid #17361f;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  box-shadow: inset 0 0 0 1px rgba(23, 54, 31, 0.45);
 }
 
 .ti-feed-head {
@@ -291,6 +295,7 @@ button {
 }
 
 .ti-feed-list {
+  flex: 1;
   overflow-y: auto;
   min-height: 0;
 }
@@ -335,7 +340,7 @@ button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 12px;
+  font-size: 14px;
   color: #b6ffc4;
 }
 
@@ -401,6 +406,8 @@ button {
 .ti-right-col {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .ti-breaking-panel,
@@ -483,6 +490,7 @@ button {
   color: var(--ti-amber);
   font-size: 9px;
   font-weight: 700;
+  animation: ti-pulse 2s ease-in-out infinite;
 }
 
 .ti-empty-note {
@@ -493,6 +501,17 @@ button {
 .ti-movers-list {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.ti-movers-panel {
+  border: 1px solid #17361f;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  box-shadow: inset 0 0 0 1px rgba(23, 54, 31, 0.45);
 }
 
 .ti-mover-row {
@@ -664,10 +683,14 @@ button {
   }
 
   .ti-sidebar,
-  .ti-feed-panel,
   .ti-breaking-panel,
   .ti-movers-panel {
     border: 1px solid var(--ti-border);
+  }
+
+  .ti-feed-panel,
+  .ti-movers-panel {
+    border: 1px solid #17361f;
   }
 
   .ti-sidebar-list {

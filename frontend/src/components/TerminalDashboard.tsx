@@ -390,6 +390,7 @@ const TickerBar = memo(function TickerBar({ items }: { items: MarketCard[] }) {
 
     const baseDurationSeconds = 48.9;
     const speedFactor = 0.8;
+    const stopEasingMs = 165;
     let lastFrame = performance.now();
 
     const animate = (timestamp: number) => {
@@ -400,7 +401,7 @@ const TickerBar = memo(function TickerBar({ items }: { items: MarketCard[] }) {
       if (segmentWidth > 0) {
         const baseSpeedPxPerSecond = (segmentWidth / baseDurationSeconds) * speedFactor;
         const targetSpeedPxPerSecond = isHoveredRef.current ? 0 : baseSpeedPxPerSecond;
-        const easing = 1 - Math.exp(-deltaMs / 220);
+        const easing = 1 - Math.exp(-deltaMs / stopEasingMs);
 
         speedRef.current += (targetSpeedPxPerSecond - speedRef.current) * easing;
         offsetRef.current -= speedRef.current * (deltaMs / 1000);
