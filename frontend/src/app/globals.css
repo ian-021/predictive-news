@@ -582,6 +582,7 @@ button {
 .ti-green {
   color: var(--ti-green);
   text-shadow: 0 0 8px rgba(71, 255, 107, 0.35);
+  filter: drop-shadow(0 0 6px rgba(71, 255, 107, 0.4)) drop-shadow(0 0 14px rgba(71, 255, 107, 0.2));
 }
 
 .ti-amber {

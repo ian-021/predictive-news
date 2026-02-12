@@ -32,6 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <div className="ti-crt-overlay" aria-hidden="true" />
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
