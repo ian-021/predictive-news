@@ -410,85 +410,6 @@ export function TerminalDashboard() {
 }
 
 const TickerBar = memo(function TickerBar({ items }: { items: MarketCard[] }) {
-  const trackRef = useRef<HTMLDivElement | null>(null);
-  const frameRef = useRef<number | null>(null);
-  const segmentWidthRef = useRef(0);
-  const offsetRef = useRef(0);
-  const speedRef = useRef(0);
-  const isHoveredRef = useRef(false);
-
-  useEffect(() => {
-    const track = trackRef.current;
-    if (!track || items.length === 0) return;
-
-    const syncWidth = () => {
-      const segmentWidth = track.scrollWidth / 2;
-      segmentWidthRef.current = segmentWidth;
-
-      if (segmentWidth <= 0) {
-        offsetRef.current = 0;
-        track.style.transform = "translate3d(0, 0, 0)";
-        return;
-      }
-
-      while (offsetRef.current <= -segmentWidth) {
-        offsetRef.current += segmentWidth;
-      }
-      while (offsetRef.current > 0) {
-        offsetRef.current -= segmentWidth;
-      }
-
-      track.style.transform = `translate3d(${offsetRef.current}px, 0, 0)`;
-    };
-
-    syncWidth();
-    window.addEventListener("resize", syncWidth);
-
-    return () => window.removeEventListener("resize", syncWidth);
-  }, [items]);
-
-  useEffect(() => {
-    const track = trackRef.current;
-    if (!track || items.length === 0) return;
-
-    const baseDurationSeconds = 48.9;
-    const speedFactor = 0.3;
-    const stopEasingMs = 165;
-    let lastFrame = performance.now();
-
-    const animate = (timestamp: number) => {
-      const deltaMs = timestamp - lastFrame;
-      lastFrame = timestamp;
-      const segmentWidth = segmentWidthRef.current;
-
-      if (segmentWidth > 0) {
-        const baseSpeedPxPerSecond = (segmentWidth / baseDurationSeconds) * speedFactor;
-        const targetSpeedPxPerSecond = isHoveredRef.current ? 0 : baseSpeedPxPerSecond;
-        const easing = 1 - Math.exp(-deltaMs / stopEasingMs);
-
-        speedRef.current += (targetSpeedPxPerSecond - speedRef.current) * easing;
-        offsetRef.current -= speedRef.current * (deltaMs / 1000);
-
-        if (offsetRef.current <= -segmentWidth) {
-          offsetRef.current += segmentWidth;
-        }
-
-        track.style.transform = `translate3d(${offsetRef.current}px, 0, 0)`;
-      }
-
-      frameRef.current = window.requestAnimationFrame(animate);
-    };
-
-    frameRef.current = window.requestAnimationFrame(animate);
-
-    return () => {
-      if (frameRef.current !== null) {
-        window.cancelAnimationFrame(frameRef.current);
-        frameRef.current = null;
-      }
-    };
-  }, [items]);
-
   if (items.length === 0) {
     return (
       <div className="ti-ticker-shell">
@@ -500,16 +421,8 @@ const TickerBar = memo(function TickerBar({ items }: { items: MarketCard[] }) {
   }
 
   return (
-    <div
-      className="ti-ticker-shell"
-      onMouseEnter={() => {
-        isHoveredRef.current = true;
-      }}
-      onMouseLeave={() => {
-        isHoveredRef.current = false;
-      }}
-    >
-      <div ref={trackRef} className="ti-ticker-track">
+    <div className="ti-ticker-shell">
+      <div className="ti-ticker-track ti-ticker-track-animated">
         {items.concat(items).map((market, idx) => {
           const probability = toPercent(market.current_price);
           const colorClass = probabilityColorClass(probability);

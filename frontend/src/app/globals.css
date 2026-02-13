@@ -92,6 +92,7 @@ button {
 
 .ti-shell {
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--ti-bg);
@@ -101,7 +102,7 @@ button {
 }
 
 .ti-crt-overlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 2;
@@ -124,6 +125,10 @@ button {
   overflow: hidden;
   border-bottom: 1px solid var(--ti-border);
   background: #090909;
+  contain: paint;
+  isolation: isolate;
+  z-index: 3;
+  transform: translateZ(0);
 }
 
 .ti-ticker-track {
@@ -132,6 +137,15 @@ button {
   white-space: nowrap;
   transform: translate3d(0, 0, 0);
   will-change: transform;
+  backface-visibility: hidden;
+}
+
+.ti-ticker-track-animated {
+  animation: ti-ticker-scroll 163s linear infinite;
+}
+
+.ti-ticker-shell:hover .ti-ticker-track-animated {
+  animation-play-state: paused;
 }
 
 .ti-ticker-item {
@@ -340,6 +354,7 @@ button {
   min-height: 0;
   box-shadow: inset 0 0 0 1px rgba(23, 54, 31, 0.45);
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  contain: layout paint;
 }
 
 .ti-feed-sync-glow {
@@ -373,10 +388,15 @@ button {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  will-change: scroll-position;
 }
 
 .ti-feed-item-wrap {
   border-bottom: 1px solid var(--ti-border);
+  content-visibility: auto;
+  contain-intrinsic-size: 72px;
 }
 
 .ti-feed-item {
@@ -733,10 +753,10 @@ button {
 
 @keyframes ti-ticker-scroll {
   0% {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
   100% {
-    transform: translateX(-50%);
+    transform: translate3d(-50%, 0, 0);
   }
 }
 
@@ -881,6 +901,13 @@ button {
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ti-ticker-track-animated {
+    animation: none;
+    transform: translate3d(0, 0, 0);
   }
 }
 
