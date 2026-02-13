@@ -41,13 +41,13 @@ const signedDelta = (market: MarketCard) => {
 };
 
 const probabilityColorClass = (probability: number) => {
-  if (probability > 80) return "ti-green";
+  if (probability > 70) return "ti-green";
   if (probability >= 50) return "ti-amber";
   return "ti-red";
 };
 
 const tickerIndicatorSymbol = (probability: number) => {
-  if (probability > 80) return "▲";
+  if (probability > 70) return "▲";
   if (probability >= 50) return "●";
   return "▼";
 };
