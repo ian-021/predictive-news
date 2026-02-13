@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useCategories, useHealth, useMarketDetail, useMarketFeed } from "@/hooks/useMarkets";
 import { formatRelativeTime, formatVolume } from "@/lib/utils";
 import type { CategorySlug, FeedFilters, MarketCard, PricePoint } from "@/lib/types";
@@ -89,10 +89,38 @@ const buildSidebarCategories = (categories: { name: string; slug: string; market
 export function TerminalDashboard() {
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("all");
   const [expandedMarketId, setExpandedMarketId] = useState<string | null>(null);
+  const [feedSearchQuery, setFeedSearchQuery] = useState("");
+  const deferredFeedSearchQuery = useDeferredValue(feedSearchQuery);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setExpandedMarketId(null);
   }, [selectedCategory]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+
+      const activeElement = document.activeElement;
+      const isTypingField =
+        activeElement instanceof HTMLInputElement ||
+        activeElement instanceof HTMLTextAreaElement ||
+        activeElement instanceof HTMLSelectElement ||
+        (activeElement instanceof HTMLElement && activeElement.isContentEditable);
+
+      if (isTypingField) {
+        return;
+      }
+
+      event.preventDefault();
+      searchInputRef.current?.focus();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const filters: FeedFilters = useMemo(
     () => ({
@@ -117,6 +145,19 @@ export function TerminalDashboard() {
     return [...markets].sort((a, b) => toPercent(b.current_price) - toPercent(a.current_price));
   }, [markets]);
 
+  const filteredFeedMarkets = useMemo(() => {
+    const query = deferredFeedSearchQuery.trim().toLowerCase();
+    if (!query) {
+      return sortedMarkets;
+    }
+
+    return sortedMarkets.filter((market) => {
+      const question = market.question.toLowerCase();
+      const category = market.category.toLowerCase();
+      return question.includes(query) || category.includes(query);
+    });
+  }, [deferredFeedSearchQuery, sortedMarkets]);
+
   const tickerItems = useMemo(() => {
     return [...sortedMarkets]
       .sort((a, b) => Math.abs(signedDelta(b)) - Math.abs(signedDelta(a)))
@@ -140,26 +181,19 @@ export function TerminalDashboard() {
     [categoriesQuery.data]
   );
 
-  const avgConfidence = useMemo(() => {
-    if (sortedMarkets.length === 0) return 0;
-    const total = sortedMarkets.reduce((sum, market) => sum + toPercent(market.current_price), 0);
-    return total / sortedMarkets.length;
-  }, [sortedMarkets]);
-
-  const highConfidenceCount = useMemo(
-    () => sortedMarkets.filter((market) => toPercent(market.current_price) >= 80).length,
-    [sortedMarkets]
-  );
-
-  const healthScore = useMemo(() => {
-    const rate = healthQuery.data?.api_error_rate;
-    if (rate === null || rate === undefined) return "--";
-    const score = Math.max(0, 100 - rate * 100);
-    return score.toFixed(1);
-  }, [healthQuery.data?.api_error_rate]);
-
   const isConnected = healthQuery.data?.status === "healthy";
   const feedSyncFlash = useSyncFlash(healthQuery.data?.last_ingestion);
+
+  useEffect(() => {
+    if (!expandedMarketId) {
+      return;
+    }
+
+    const isVisible = filteredFeedMarkets.some((market) => market.id === expandedMarketId);
+    if (!isVisible) {
+      setExpandedMarketId(null);
+    }
+  }, [expandedMarketId, filteredFeedMarkets]);
 
   return (
     <div className="ti-shell">
@@ -179,18 +213,30 @@ export function TerminalDashboard() {
         </div>
       </header>
 
-      <section className="ti-stats-bar">
-        <span>
-          TRACKED: <strong>{feedQuery.data?.pages[0]?.total ?? sortedMarkets.length}</strong>
-        </span>
-        <span>
-          AVG CONF: <strong>{avgConfidence.toFixed(1)}%</strong>
-        </span>
-        <span>
-          &gt;80% PROB: <strong>{highConfidenceCount}</strong>
-        </span>
-        <span>
-          API HEALTH: <strong>{healthScore === "--" ? healthScore : `${healthScore}%`}</strong>
+      <section className="ti-search-bar">
+        <label className="ti-search-wrap" htmlFor="primary-feed-search">
+          <span className="ti-search-label">SEARCH</span>
+          <input
+            ref={searchInputRef}
+            id="primary-feed-search"
+            className="ti-search-input"
+            type="text"
+            value={feedSearchQuery}
+            onChange={(event) => setFeedSearchQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" || event.key === "Esc") {
+                event.preventDefault();
+                event.currentTarget.blur();
+              }
+            }}
+            placeholder=""
+            autoComplete="off"
+            spellCheck={false}
+            aria-label="Filter primary feed"
+          />
+        </label>
+        <span className="ti-search-hint">
+          PRESS <kbd className="ti-search-key">/</kbd>
         </span>
       </section>
 
@@ -214,7 +260,7 @@ export function TerminalDashboard() {
         <section className={`ti-panel ti-feed-panel${feedSyncFlash ? " ti-feed-sync-glow" : ""}`}>
           <div className="ti-panel-head ti-feed-head">
             <span>PRIMARY FEED - WIRE SERVICE</span>
-            <span>{sortedMarkets.length} ACTIVE</span>
+            <span>{filteredFeedMarkets.length}/{sortedMarkets.length} ACTIVE</span>
           </div>
 
           <div className="ti-feed-list">
@@ -232,7 +278,11 @@ export function TerminalDashboard() {
               <div className="ti-state-row">No active markets available.</div>
             )}
 
-            {sortedMarkets.map((market) => {
+            {!feedQuery.isLoading && !feedQuery.error && sortedMarkets.length > 0 && filteredFeedMarkets.length === 0 && (
+              <div className="ti-state-row">No markets match that search.</div>
+            )}
+
+            {filteredFeedMarkets.map((market) => {
               const probability = toPercent(market.current_price);
               const delta = signedDelta(market);
               const isUp = delta >= 0;
