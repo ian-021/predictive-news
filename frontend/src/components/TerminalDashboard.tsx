@@ -26,6 +26,7 @@ function useSyncFlash(lastIngestion: string | null | undefined) {
 }
 
 type CategoryFilter = "all" | CategorySlug;
+type FeedTab = "active" | "recently_resolved";
 
 interface SidebarCategory {
   label: string;
@@ -88,6 +89,7 @@ const buildSidebarCategories = (categories: { name: string; slug: string; market
 
 export function TerminalDashboard() {
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("all");
+  const [feedTab, setFeedTab] = useState<FeedTab>("active");
   const [expandedMarketId, setExpandedMarketId] = useState<string | null>(null);
   const [feedSearchQuery, setFeedSearchQuery] = useState("");
   const deferredFeedSearchQuery = useDeferredValue(feedSearchQuery);
@@ -95,7 +97,7 @@ export function TerminalDashboard() {
 
   useEffect(() => {
     setExpandedMarketId(null);
-  }, [selectedCategory]);
+  }, [selectedCategory, feedTab]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -122,17 +124,30 @@ export function TerminalDashboard() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const filters: FeedFilters = useMemo(
+  const activeFilters: FeedFilters = useMemo(
     () => ({
       category: selectedCategory === "all" ? null : selectedCategory,
       sort: "interesting",
+      status: "active",
       limit: 100,
       offset: 0,
     }),
     [selectedCategory]
   );
 
-  const feedQuery = useMarketFeed(filters);
+  const resolvedFilters: FeedFilters = useMemo(
+    () => ({
+      category: selectedCategory === "all" ? null : selectedCategory,
+      sort: "trending",
+      status: "recently_resolved",
+      limit: 100,
+      offset: 0,
+    }),
+    [selectedCategory]
+  );
+
+  const feedQuery = useMarketFeed(activeFilters);
+  const recentlyResolvedQuery = useMarketFeed(resolvedFilters);
   const categoriesQuery = useCategories();
   const healthQuery = useHealth();
 
@@ -144,6 +159,11 @@ export function TerminalDashboard() {
   const sortedMarkets = useMemo(() => {
     return [...markets].sort((a, b) => toPercent(b.current_price) - toPercent(a.current_price));
   }, [markets]);
+
+  const recentlyResolvedMarkets = useMemo(
+    () => (recentlyResolvedQuery.data?.pages ?? []).flatMap((page) => page.markets),
+    [recentlyResolvedQuery.data]
+  );
 
   const filteredFeedMarkets = useMemo(() => {
     const query = deferredFeedSearchQuery.trim().toLowerCase();
@@ -157,6 +177,23 @@ export function TerminalDashboard() {
       return question.includes(query) || category.includes(query);
     });
   }, [deferredFeedSearchQuery, sortedMarkets]);
+
+  const filteredResolvedMarkets = useMemo(() => {
+    const query = deferredFeedSearchQuery.trim().toLowerCase();
+    if (!query) {
+      return recentlyResolvedMarkets;
+    }
+
+    return recentlyResolvedMarkets.filter((market) => {
+      const question = market.question.toLowerCase();
+      const category = market.category.toLowerCase();
+      return question.includes(query) || category.includes(query);
+    });
+  }, [deferredFeedSearchQuery, recentlyResolvedMarkets]);
+
+  const visibleFeedMarkets = feedTab === "active" ? filteredFeedMarkets : filteredResolvedMarkets;
+  const totalInTab = feedTab === "active" ? sortedMarkets.length : recentlyResolvedMarkets.length;
+  const currentFeedQuery = feedTab === "active" ? feedQuery : recentlyResolvedQuery;
 
   const tickerItems = useMemo(() => {
     return [...sortedMarkets]
@@ -189,11 +226,11 @@ export function TerminalDashboard() {
       return;
     }
 
-    const isVisible = filteredFeedMarkets.some((market) => market.id === expandedMarketId);
+    const isVisible = visibleFeedMarkets.some((market) => market.id === expandedMarketId);
     if (!isVisible) {
       setExpandedMarketId(null);
     }
-  }, [expandedMarketId, filteredFeedMarkets]);
+  }, [expandedMarketId, visibleFeedMarkets]);
 
   return (
     <div className="ti-shell">
@@ -232,7 +269,7 @@ export function TerminalDashboard() {
             placeholder=""
             autoComplete="off"
             spellCheck={false}
-            aria-label="Filter primary feed"
+            aria-label="Filter selected feed tab"
           />
         </label>
         <span className="ti-search-hint">
@@ -259,30 +296,53 @@ export function TerminalDashboard() {
 
         <section className={`ti-panel ti-feed-panel${feedSyncFlash ? " ti-feed-sync-glow" : ""}`}>
           <div className="ti-panel-head ti-feed-head">
-            <span>PRIMARY FEED - WIRE SERVICE</span>
-            <span>{filteredFeedMarkets.length}/{sortedMarkets.length} ACTIVE</span>
+            <div className="ti-feed-tabs" role="tablist" aria-label="Feed tabs">
+              <button
+                className={`ti-feed-tab ${feedTab === "active" ? "is-active" : ""}`}
+                onClick={() => setFeedTab("active")}
+                type="button"
+                role="tab"
+                aria-selected={feedTab === "active"}
+              >
+                PRIMARY FEED
+              </button>
+              <button
+                className={`ti-feed-tab ${feedTab === "recently_resolved" ? "is-active" : ""}`}
+                onClick={() => setFeedTab("recently_resolved")}
+                type="button"
+                role="tab"
+                aria-selected={feedTab === "recently_resolved"}
+              >
+                RECENTLY RESOLVED
+              </button>
+            </div>
+            <span>
+              {visibleFeedMarkets.length}/{totalInTab} {feedTab === "active" ? "ACTIVE" : "RESOLVED (24H)"}
+            </span>
           </div>
 
           <div className="ti-feed-list">
-            {feedQuery.isLoading && (
+            {currentFeedQuery.isLoading && (
               <div className="ti-state-row">
                 <div className="spinner" />
               </div>
             )}
 
-            {feedQuery.error && (
+            {currentFeedQuery.error && (
               <div className="ti-state-row ti-state-error">Unable to load market feed.</div>
             )}
 
-            {!feedQuery.isLoading && !feedQuery.error && sortedMarkets.length === 0 && (
-              <div className="ti-state-row">No active markets available.</div>
+            {!currentFeedQuery.isLoading && !currentFeedQuery.error && totalInTab === 0 && (
+              <div className="ti-state-row">
+                {feedTab === "active" ? "No active markets available." : "No markets resolved in the last 24 hours."}
+              </div>
             )}
 
-            {!feedQuery.isLoading && !feedQuery.error && sortedMarkets.length > 0 && filteredFeedMarkets.length === 0 && (
+            {!currentFeedQuery.isLoading && !currentFeedQuery.error && totalInTab > 0 && visibleFeedMarkets.length === 0 && (
               <div className="ti-state-row">No markets match that search.</div>
             )}
 
-            {filteredFeedMarkets.map((market) => {
+            {visibleFeedMarkets.map((market) => {
               const probability = toPercent(market.current_price);
               const delta = signedDelta(market);
               const isUp = delta >= 0;

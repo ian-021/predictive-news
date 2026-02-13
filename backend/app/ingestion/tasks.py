@@ -7,7 +7,7 @@ safely in Celery workers and background threads.
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import redis
 from sqlalchemy import create_engine, text
@@ -40,36 +40,118 @@ def ingest_markets_task():
     logger.info("Starting market ingestion...")
     engine = get_sync_engine()
     rds = get_sync_redis()
+    now = datetime.now(timezone.utc)
 
     try:
+        # Ensure schema additions exist before writes (safe for repeated runs).
+        with Session(engine) as session:
+            _ensure_markets_schema(session)
+            session.commit()
+
         # Fetch markets from Polymarket (sync HTTP)
         from app.ingestion.polymarket import PolymarketClient
         client = PolymarketClient()
 
-        all_markets = []
-        offset = 0
-        batch_size = 100
+        all_markets_by_id: dict[str, dict] = {}
+        active_batch_size = 100
+        resolved_batch_size = settings.RESOLVED_FETCH_BATCH_SIZE
+        max_active_pages = settings.MAX_ACTIVE_PAGES
+        max_resolved_pages = settings.MAX_RESOLVED_PAGES
+        resolved_cutoff = now - timedelta(hours=settings.RECENTLY_RESOLVED_WINDOW_HOURS)
 
         try:
-            for _ in range(5):  # Max 5 pages = 500 markets
-                markets = client.fetch_markets(limit=batch_size, offset=offset)
+            active_offset = 0
+            for _ in range(max_active_pages):
+                markets = client.fetch_markets(
+                    limit=active_batch_size,
+                    offset=active_offset,
+                    active=True,
+                    closed=False,
+                    order="volume",
+                    ascending=False,
+                )
                 if not markets:
                     break
-                all_markets.extend(markets)
-                offset += batch_size
+                for market in markets:
+                    all_markets_by_id[market["id"]] = market
+                active_offset += active_batch_size
 
                 # Track API request count
                 _increment_counter(rds, "polynews:requests:daily", ttl=86400)
+
+            resolved_offset = 0
+            for _ in range(max_resolved_pages):
+                markets = client.fetch_recently_resolved_markets(
+                    limit=resolved_batch_size,
+                    offset=resolved_offset,
+                )
+                if not markets:
+                    break
+
+                for market in markets:
+                    all_markets_by_id[market["id"]] = market
+
+                resolved_offset += resolved_batch_size
+
+                # Track API request count
+                _increment_counter(rds, "polynews:requests:daily", ttl=86400)
+
+                # Stop once we have likely covered recently closed markets.
+                closed_times = [m.get("closed_time") for m in markets if m.get("closed_time")]
+                if closed_times:
+                    oldest_closed_time = min(closed_times)
+                    if oldest_closed_time < resolved_cutoff:
+                        logger.info(
+                            "Resolved fetch reached cutoff at offset %s (oldest closed_time=%s)",
+                            resolved_offset,
+                            oldest_closed_time.isoformat(),
+                        )
+                        break
+                elif len(markets) < resolved_batch_size:
+                    break
+
+            # Reconcile stale active rows (past resolution date) by direct ID lookup.
+            with Session(engine) as session:
+                stale_market_ids = _get_stale_active_market_ids(
+                    session,
+                    settings.STALE_ACTIVE_RECONCILE_LIMIT,
+                    settings.STALE_ACTIVE_RECHECK_MINUTES,
+                )
+
+            reconciled_requests = 0
+            reconciled_markets = 0
+            if stale_market_ids:
+                logger.info(
+                    "Reconciling %s stale active markets by ID",
+                    len(stale_market_ids),
+                )
+            for market_id in stale_market_ids:
+                refreshed = client.fetch_market(market_id)
+                reconciled_requests += 1
+                if refreshed:
+                    all_markets_by_id[market_id] = refreshed
+                    reconciled_markets += 1
+            if reconciled_requests:
+                _increment_counter(
+                    rds,
+                    "polynews:requests:daily",
+                    count=reconciled_requests,
+                    ttl=86400,
+                )
+                logger.info(
+                    "Reconciled stale active markets: %s refreshed via direct lookup",
+                    reconciled_markets,
+                )
         finally:
             client.close()
 
+        all_markets = list(all_markets_by_id.values())
         logger.info(f"Fetched {len(all_markets)} markets from Polymarket")
 
         if not all_markets:
             logger.warning("No markets fetched, skipping ingestion")
             return
 
-        now = datetime.now(timezone.utc)
         errors = 0
 
         # Write to database
@@ -80,16 +162,18 @@ def ingest_markets_task():
                     session.execute(
                         text("""
                             INSERT INTO markets (id, question, description, category,
-                                resolution_date, created_at, status, last_updated,
-                                outcomes, image_url, slug)
+                                resolution_date, closed_time, resolution_status,
+                                created_at, status, last_updated, outcomes, image_url, slug)
                             VALUES (:id, :question, :description, :category,
-                                :resolution_date, :created_at, :status, :last_updated,
-                                :outcomes, :image_url, :slug)
+                                :resolution_date, :closed_time, :resolution_status,
+                                :created_at, :status, :last_updated, :outcomes, :image_url, :slug)
                             ON CONFLICT (id) DO UPDATE SET
                                 question = EXCLUDED.question,
                                 description = EXCLUDED.description,
                                 category = EXCLUDED.category,
                                 resolution_date = EXCLUDED.resolution_date,
+                                closed_time = EXCLUDED.closed_time,
+                                resolution_status = EXCLUDED.resolution_status,
                                 status = EXCLUDED.status,
                                 last_updated = EXCLUDED.last_updated,
                                 outcomes = EXCLUDED.outcomes,
@@ -102,6 +186,8 @@ def ingest_markets_task():
                             "description": market_data.get("description"),
                             "category": market_data["category"],
                             "resolution_date": market_data.get("resolution_date"),
+                            "closed_time": market_data.get("closed_time"),
+                            "resolution_status": market_data.get("resolution_status"),
                             "created_at": market_data.get("created_at", now),
                             "status": market_data.get("status", "active"),
                             "last_updated": now,
@@ -149,6 +235,9 @@ def ingest_markets_task():
 
             session.commit()
 
+        with Session(engine) as session:
+            _log_data_quality_metrics(session)
+
         # Refresh materialized view
         try:
             with Session(engine) as session:
@@ -193,6 +282,58 @@ def _increment_counter(rds, key: str, count: int = 1, ttl: int = 3600):
         pipe.execute()
     except Exception:
         logger.exception("Failed to increment Redis counter: %s", key)
+
+
+def _ensure_markets_schema(session: Session):
+    """Create additive schema columns used for resolution correctness."""
+    session.execute(text("ALTER TABLE markets ADD COLUMN IF NOT EXISTS closed_time TIMESTAMPTZ"))
+    session.execute(text("ALTER TABLE markets ADD COLUMN IF NOT EXISTS resolution_status TEXT"))
+    session.execute(
+        text("CREATE INDEX IF NOT EXISTS idx_markets_closed_time ON markets(closed_time DESC)")
+    )
+
+
+def _get_stale_active_market_ids(
+    session: Session,
+    limit: int,
+    recheck_minutes: int,
+) -> list[str]:
+    """Find active markets whose resolution date has already passed."""
+    rows = session.execute(
+        text("""
+            SELECT id
+            FROM markets
+            WHERE status = 'active'
+                AND resolution_date IS NOT NULL
+                AND resolution_date < NOW()
+                AND last_updated < NOW() - (:recheck_minutes * INTERVAL '1 minute')
+            ORDER BY resolution_date DESC
+            LIMIT :limit
+        """),
+        {
+            "limit": limit,
+            "recheck_minutes": recheck_minutes,
+        },
+    ).fetchall()
+    return [row.id for row in rows]
+
+
+def _log_data_quality_metrics(session: Session):
+    """Emit warnings when market status appears out of sync."""
+    active_past_resolution = session.execute(
+        text("""
+            SELECT COUNT(*)
+            FROM markets
+            WHERE status = 'active'
+                AND resolution_date IS NOT NULL
+                AND resolution_date < NOW()
+        """)
+    ).scalar() or 0
+    if active_past_resolution > 0:
+        logger.warning(
+            "Data quality: %s active markets have resolution_date in the past",
+            active_past_resolution,
+        )
 
 
 def _delete_keys_by_pattern(rds, pattern: str):

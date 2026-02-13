@@ -6,7 +6,7 @@ import type { FeedFilters } from "@/lib/types";
 
 export function useMarketFeed(filters: FeedFilters) {
   return useInfiniteQuery({
-    queryKey: ["markets", filters.category, filters.sort],
+    queryKey: ["markets", filters.category, filters.sort, filters.status ?? "active"],
     queryFn: ({ pageParam = 0 }) =>
       fetchMarkets({ ...filters, offset: pageParam }),
     initialPageParam: 0,

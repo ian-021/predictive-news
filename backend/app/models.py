@@ -21,6 +21,8 @@ class Market(Base):
     description = Column(Text)
     category = Column(Text, nullable=False, default="other")
     resolution_date = Column(DateTime(timezone=True))
+    closed_time = Column(DateTime(timezone=True))
+    resolution_status = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     status = Column(Text, nullable=False, default="active")
     last_updated = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -32,6 +34,7 @@ class Market(Base):
     __table_args__ = (
         Index("idx_markets_category", "category"),
         Index("idx_markets_status", "status"),
+        Index("idx_markets_closed_time", "closed_time"),
     )
 
 

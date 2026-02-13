@@ -382,6 +382,34 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
+}
+
+.ti-feed-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ti-feed-tab {
+  border: 1px solid var(--ti-border);
+  padding: 4px 8px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ti-dim);
+  background: transparent;
+  white-space: nowrap;
+}
+
+.ti-feed-tab.is-active {
+  color: var(--ti-green);
+  background: rgba(71, 255, 107, 0.12);
+  text-shadow: 0 0 8px rgba(71, 255, 107, 0.4);
+}
+
+.ti-feed-tab:hover {
+  background: rgba(71, 255, 107, 0.08);
 }
 
 .ti-feed-list {
@@ -836,6 +864,16 @@ button {
   .ti-feed-list {
     max-height: 56vh;
   }
+
+  .ti-feed-head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .ti-feed-tabs {
+    overflow-x: auto;
+    max-width: 100%;
+  }
 }
 
 @media (max-width: 700px) {
@@ -879,6 +917,11 @@ button {
   .ti-feed-meta {
     grid-area: meta;
     flex-wrap: wrap;
+  }
+
+  .ti-feed-tab {
+    font-size: 9px;
+    padding: 4px 6px;
   }
 
   .ti-detail-grid {

@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     CATEGORY_CACHE_TTL: int = 3600  # 1 hour
     MARKET_CACHE_TTL: int = 90  # 90 seconds
     INGESTION_INTERVAL: int = 120  # 2 minutes in seconds
+    MAX_ACTIVE_PAGES: int = 5
+    MAX_RESOLVED_PAGES: int = 6
+    RESOLVED_FETCH_BATCH_SIZE: int = 250
+    RECENTLY_RESOLVED_WINDOW_HOURS: int = 24
+    STALE_ACTIVE_RECONCILE_LIMIT: int = 100
+    STALE_ACTIVE_RECHECK_MINUTES: int = 60
 
     # Staleness threshold (seconds)
     STALENESS_THRESHOLD: int = 300  # 5 minutes

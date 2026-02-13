@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS markets (
     description TEXT,
     category TEXT NOT NULL DEFAULT 'other',
     resolution_date TIMESTAMPTZ,
+    closed_time TIMESTAMPTZ,
+    resolution_status TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     status TEXT NOT NULL DEFAULT 'active',
     last_updated TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -17,6 +19,7 @@ CREATE TABLE IF NOT EXISTS markets (
 
 CREATE INDEX idx_markets_category ON markets(category);
 CREATE INDEX idx_markets_status ON markets(status);
+CREATE INDEX idx_markets_closed_time ON markets(closed_time DESC);
 CREATE INDEX idx_markets_featured ON markets(is_featured) WHERE is_featured = TRUE;
 
 CREATE TABLE IF NOT EXISTS snapshots (

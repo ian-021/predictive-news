@@ -64,10 +64,12 @@ export interface HealthResponse {
 
 export type SortOption = "interesting" | "trending";
 export type CategorySlug = "politics" | "crypto" | "sports" | "tech" | "other";
+export type MarketStatusFilter = "active" | "resolved" | "recently_resolved";
 
 export interface FeedFilters {
   category: CategorySlug | null;
   sort: SortOption;
+  status?: MarketStatusFilter;
   limit: number;
   offset: number;
 }

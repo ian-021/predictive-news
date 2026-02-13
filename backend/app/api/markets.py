@@ -15,12 +15,14 @@ settings = get_settings()
 
 VALID_CATEGORIES = {"politics", "crypto", "sports", "tech", "other"}
 VALID_SORTS = {"trending", "interesting"}
+VALID_STATUSES = {"active", "resolved", "recently_resolved"}
 
 
 @router.get("", response_model=FeedResponse)
 async def get_markets(
     category: Optional[str] = Query(None, description="Filter by category"),
     sort: str = Query("interesting", description="Sort order: trending or interesting"),
+    status: str = Query("active", description="Market status: active, resolved, recently_resolved"),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -31,12 +33,26 @@ async def get_markets(
         raise HTTPException(status_code=400, detail=f"Invalid category. Must be one of: {', '.join(VALID_CATEGORIES)}")
     if sort not in VALID_SORTS:
         raise HTTPException(status_code=400, detail=f"Invalid sort. Must be one of: {', '.join(VALID_SORTS)}")
+    if status not in VALID_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(VALID_STATUSES)}")
 
     # Check cache
-    cache_key = f"polynews:feed:{category or 'all'}:{sort}:{limit}:{offset}"
+    cache_key = f"polynews:feed:{category or 'all'}:{sort}:{status}:{limit}:{offset}"
     cached = await cache_get(cache_key)
     if cached:
         return FeedResponse(**cached)
+
+    status_filter = "m.status = 'active'"
+    if status == "resolved":
+        status_filter = "m.status = 'resolved'"
+    elif status == "recently_resolved":
+        status_filter = (
+            "m.status = 'resolved' AND COALESCE(m.closed_time, m.last_updated) >= NOW() - INTERVAL '24 hours'"
+        )
+
+    order_clause = "delta DESC, volume DESC" if sort == "trending" else "volume DESC, delta DESC"
+    if status != "active":
+        order_clause = "COALESCE(m.closed_time, m.last_updated) DESC, m.resolution_date DESC NULLS LAST"
 
     # Build query
     query = text("""
@@ -85,21 +101,23 @@ async def get_markets(
         LEFT JOIN latest_snap ls ON m.id = ls.market_id
         LEFT JOIN day_ago_snap d ON m.id = d.market_id
         LEFT JOIN vol_ranks vr ON m.id = vr.market_id
-        WHERE m.status = 'active'
+        WHERE {status_filter}
         {category_filter}
         ORDER BY {order_clause}
         LIMIT :limit OFFSET :offset
     """.format(
+        status_filter=status_filter,
         category_filter="AND m.category = :category" if category else "",
-        order_clause="delta DESC, volume DESC" if sort == "trending" else "volume DESC, delta DESC",
+        order_clause=order_clause,
     ))
 
     # Count query
     count_query = text("""
         SELECT COUNT(*) FROM markets m
-        WHERE m.status = 'active'
+        WHERE {status_filter}
         {category_filter}
     """.format(
+        status_filter=status_filter,
         category_filter="AND m.category = :category" if category else "",
     ))
 
@@ -130,8 +148,8 @@ async def get_markets(
             slug=row.slug,
         )
 
-        # Calculate interesting score for sorting if needed
-        if sort == "interesting":
+        # Calculate interesting score for sorting only on active feed.
+        if sort == "interesting" and status == "active":
             card._interesting_score = calculate_interesting_score(
                 delta=float(row.delta) if row.delta else 0,
                 volume=float(row.volume),
@@ -144,7 +162,7 @@ async def get_markets(
         markets.append(card)
 
     # Sort by interesting score if applicable
-    if sort == "interesting":
+    if sort == "interesting" and status == "active":
         markets.sort(key=lambda m: getattr(m, "_interesting_score", 0), reverse=True)
 
     response = FeedResponse(

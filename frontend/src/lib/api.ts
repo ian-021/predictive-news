@@ -24,6 +24,7 @@ export async function fetchMarkets(filters: FeedFilters): Promise<FeedResponse> 
   const params = new URLSearchParams();
   if (filters.category) params.set("category", filters.category);
   params.set("sort", filters.sort);
+  if (filters.status) params.set("status", filters.status);
   params.set("limit", String(filters.limit));
   params.set("offset", String(filters.offset));
 

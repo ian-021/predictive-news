@@ -39,7 +39,10 @@ class PolymarketClient:
         self,
         limit: int = 100,
         offset: int = 0,
-        active: bool = True,
+        active: Optional[bool] = True,
+        closed: Optional[bool] = False,
+        order: str = "volume",
+        ascending: bool = False,
     ) -> list[dict]:
         """
         Fetch markets from Polymarket Gamma API.
@@ -50,11 +53,13 @@ class PolymarketClient:
             params = {
                 "limit": limit,
                 "offset": offset,
-                "active": str(active).lower(),
-                "closed": "false",
-                "order": "volume",
-                "ascending": "false",
+                "order": order,
+                "ascending": str(ascending).lower(),
             }
+            if active is not None:
+                params["active"] = str(active).lower()
+            if closed is not None:
+                params["closed"] = str(closed).lower()
 
             response = self.client.get("/markets", params=params)
             response.raise_for_status()
@@ -74,6 +79,38 @@ class PolymarketClient:
             raise
         except httpx.RequestError as e:
             logger.error(f"Polymarket API request error: {e}")
+            raise
+
+    def fetch_recently_resolved_markets(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict]:
+        """Fetch recently closed/resolved markets.
+
+        Gamma ordering can vary between deployments. We prefer closedTime ordering
+        and fall back to updatedAt if that order value is rejected.
+        """
+        try:
+            return self.fetch_markets(
+                limit=limit,
+                offset=offset,
+                active=None,
+                closed=True,
+                order="closedTime",
+                ascending=False,
+            )
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 400:
+                logger.info("Polymarket rejected order=closedTime, falling back to updatedAt ordering")
+                return self.fetch_markets(
+                    limit=limit,
+                    offset=offset,
+                    active=None,
+                    closed=True,
+                    order="updatedAt",
+                    ascending=False,
+                )
             raise
 
     def fetch_market(self, market_id: str) -> Optional[dict]:
@@ -135,6 +172,15 @@ class PolymarketClient:
             except (ValueError, AttributeError):
                 pass
 
+        closed_time = None
+        if raw.get("closedTime"):
+            try:
+                closed_time = datetime.fromisoformat(
+                    raw["closedTime"].replace("Z", "+00:00")
+                )
+            except (ValueError, AttributeError):
+                pass
+
         created_at = datetime.now(timezone.utc)
         if raw.get("createdAt"):
             try:
@@ -159,14 +205,27 @@ class PolymarketClient:
             except Exception:
                 pass
 
+        active_value = raw.get("active")
+        closed_value = raw.get("closed")
+        resolution_status = raw.get("umaResolutionStatus")
+        is_active = True if active_value is None else bool(active_value)
+        is_closed = bool(closed_value)
+        is_resolved = (
+            is_closed
+            or not is_active
+            or str(resolution_status).lower() == "resolved"
+        )
+
         return {
             "id": str(raw.get("id", "")),
             "question": raw.get("question", ""),
             "description": raw.get("description", ""),
             "category": category,
             "resolution_date": resolution_date,
+            "closed_time": closed_time,
+            "resolution_status": resolution_status,
             "created_at": created_at,
-            "status": "active" if raw.get("active") else "resolved",
+            "status": "resolved" if is_resolved else "active",
             "outcomes": outcomes,
             "image_url": raw.get("image", None),
             "slug": raw.get("slug", None),
