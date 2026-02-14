@@ -3,13 +3,16 @@ from sqlalchemy import (
     Text,
     Boolean,
     Integer,
+    Float,
     Numeric,
+    String,
     DateTime,
     ForeignKey,
     Index,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 
@@ -62,3 +65,42 @@ class IngestionError(Base):
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
     error_message = Column(Text, nullable=False)
     retry_count = Column(Integer, nullable=False, default=0)
+
+
+class MarketCluster(Base):
+    __tablename__ = "market_clusters"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(Text, nullable=False)
+    cluster_type = Column(String(50), default="threshold")  # threshold, related, manual
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    cluster_markets = relationship("ClusterMarket", back_populates="cluster", cascade="all, delete-orphan")
+
+
+class ClusterMarket(Base):
+    __tablename__ = "cluster_markets"
+
+    cluster_id = Column(Integer, ForeignKey("market_clusters.id", ondelete="CASCADE"), primary_key=True)
+    market_id = Column(Text, ForeignKey("markets.id", ondelete="CASCADE"), primary_key=True)
+    sort_value = Column(Float)  # threshold value for ordering within cluster
+
+    cluster = relationship("MarketCluster", back_populates="cluster_markets")
+
+
+class MarketContext(Base):
+    __tablename__ = "market_contexts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    market_id = Column(Text, ForeignKey("markets.id", ondelete="CASCADE"), nullable=False, index=True)
+    raw_context = Column(Text)
+    summary = Column(Text)
+    scraped_at = Column(DateTime(timezone=True))
+    scrape_status = Column(String(20), default="pending")
+    failure_reason = Column(Text)
+    retry_count = Column(Integer, default=0)
+    probability_at_scrape = Column(Float)
+    needs_refresh = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())

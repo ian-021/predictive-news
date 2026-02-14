@@ -10,6 +10,7 @@ from app.api.markets import router as markets_router
 from app.api.categories import router as categories_router
 from app.api.health import router as health_router
 from app.api.ingest import router as ingest_router
+from app.api.feed import router as feed_router
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -61,6 +62,7 @@ app.include_router(markets_router)
 app.include_router(categories_router)
 app.include_router(health_router)
 app.include_router(ingest_router)
+app.include_router(feed_router)
 
 
 @app.get("/")

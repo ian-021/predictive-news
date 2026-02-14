@@ -85,3 +85,66 @@ class HealthResponse(BaseModel):
     api_error_rate: float = 0.0
     database_connected: bool = False
     redis_connected: bool = False
+
+
+# ── Editorial Feed Schemas ──
+
+class EditorialMarket(BaseModel):
+    """Market data enriched for editorial display."""
+    id: str
+    question: str
+    headline: str
+    summary: str
+    category: str
+    current_price: float
+    probability: int  # 0-100
+    price_24h_ago: Optional[float] = None
+    change_24h: Optional[float] = None  # signed percentage points
+    volume: float
+    resolution_date: Optional[datetime] = None
+    status: str
+    slug: Optional[str] = None
+    image_url: Optional[str] = None
+    cluster_id: Optional[int] = None
+
+
+class TickerItem(BaseModel):
+    label: str
+    change: float  # signed percentage points
+    probability: float  # 0-100
+
+
+class StoryClusterSchema(BaseModel):
+    id: int
+    title: str
+    tag: str = "STORY"
+    markets: list[EditorialMarket] = []
+
+
+class FeedSectionSchema(BaseModel):
+    label: str
+    type: str = "default"
+    card_variant: str = "compact"
+    grid_cols: int = 3
+    markets: list[EditorialMarket] = []
+
+
+class HeroSection(BaseModel):
+    primary: Optional[EditorialMarket] = None
+    secondary: list[EditorialMarket] = []
+
+
+class FeedMeta(BaseModel):
+    total_markets: int = 0
+    last_sync: Optional[datetime] = None
+    sources_status: dict = {}
+
+
+class EditorialFeedResponse(BaseModel):
+    hero: HeroSection
+    clusters: list[StoryClusterSchema] = []
+    sections: list[FeedSectionSchema] = []
+    ticker: list[TickerItem] = []
+    movers: list[EditorialMarket] = []
+    recently_resolved: list[EditorialMarket] = []
+    meta: FeedMeta

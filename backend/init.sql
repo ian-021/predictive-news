@@ -46,6 +46,44 @@ CREATE TABLE IF NOT EXISTS ingestion_errors (
 CREATE INDEX idx_ingestion_errors_market ON ingestion_errors(market_id);
 CREATE INDEX idx_ingestion_errors_time ON ingestion_errors(timestamp DESC);
 
+-- ── Story Clustering ──
+
+CREATE TABLE IF NOT EXISTS market_clusters (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    cluster_type VARCHAR(50) DEFAULT 'threshold',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS cluster_markets (
+    cluster_id INTEGER NOT NULL REFERENCES market_clusters(id) ON DELETE CASCADE,
+    market_id TEXT NOT NULL REFERENCES markets(id) ON DELETE CASCADE,
+    sort_value DOUBLE PRECISION,
+    PRIMARY KEY (cluster_id, market_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cluster_markets_market ON cluster_markets(market_id);
+
+-- ── Market Context (for Polymarket AI summaries) ──
+
+CREATE TABLE IF NOT EXISTS market_contexts (
+    id SERIAL PRIMARY KEY,
+    market_id TEXT NOT NULL REFERENCES markets(id) ON DELETE CASCADE,
+    raw_context TEXT,
+    summary TEXT,
+    scraped_at TIMESTAMPTZ,
+    scrape_status VARCHAR(20) DEFAULT 'pending',
+    failure_reason TEXT,
+    retry_count INTEGER DEFAULT 0,
+    probability_at_scrape DOUBLE PRECISION,
+    needs_refresh BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_market_contexts_market ON market_contexts(market_id);
+
 -- Materialized view for trending markets (24h price movement)
 CREATE MATERIALIZED VIEW IF NOT EXISTS trending_view AS
 WITH latest AS (
